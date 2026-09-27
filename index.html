@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KSL Bar Study Tracker</title>
+<style>
+:root{
+  --bg:#f7f5f0; --card:#ffffff; --text:#1f2328; --muted:#6b7280; --border:#e5e0d8;
+  --accent:#8b2e2e; --accentSoft:#f4e4e4; --track:#e9e5dd; --shadow:rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15130f; --card:#201d18; --text:#eee9e0; --muted:#a39d90; --border:#332f27;
+    --accent:#e08a6a; --accentSoft:#3a2620; --track:#332f27; --shadow:rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15130f; --card:#201d18; --text:#eee9e0; --muted:#a39d90; --border:#332f27;
+  --accent:#e08a6a; --accentSoft:#3a2620; --track:#332f27; --shadow:rgba(0,0,0,.4);
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:'Georgia',ui-serif,serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+  min-height:100%;
+}
+.wrap{max-width:820px;margin:0 auto;padding:20px 16px 40px;}
+header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:10;padding:6px 0 14px;border-bottom:1px solid var(--border);}
+h1{font-size:1.5rem;margin:4px 0 2px;letter-spacing:.2px;}
+.sub{color:var(--muted);font-size:.85rem;margin-bottom:12px;font-family:ui-sans-serif,system-ui,sans-serif;}
+.progress-row{display:flex;align-items:center;gap:10px;margin:8px 0;}
+.progress-track{flex:1;height:10px;background:var(--track);border-radius:6px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);width:0%;transition:width .3s;}
+.progress-pct{font-size:.8rem;color:var(--muted);min-width:70px;text-align:right;font-family:ui-sans-serif,system-ui,sans-serif;}
+.controls{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-family:ui-sans-serif,system-ui,sans-serif;}
+select,button{
+  font-family:inherit;font-size:.8rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);cursor:pointer;
+}
+button.reset{margin-left:auto;color:var(--accent);border-color:var(--accent);}
+.day{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;margin-top:14px;
+  box-shadow:0 1px 3px var(--shadow);overflow:hidden;
+}
+.day-head{
+  display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none;
+}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.day-date{font-weight:bold;font-size:.95rem;}
+.day-sub{font-size:.75rem;color:var(--muted);font-family:ui-sans-serif,system-ui,sans-serif;}
+.day-meta{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:ui-sans-serif,system-ui,sans-serif;}
+.count{font-size:.75rem;color:var(--muted);}
+.chev{transition:transform .2s;color:var(--muted);}
+.day.open .chev{transform:rotate(90deg);}
+.sessions{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.day.open .sessions{max-height:600px;}
+.sess{
+  display:flex;gap:10px;align-items:flex-start;padding:9px 14px 9px 40px;border-top:1px solid var(--border);
+  font-size:.88rem;
+}
+.sess.done .topic{text-decoration:line-through;color:var(--muted);}
+.sess input{margin-top:3px;width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;}
+.time{color:var(--muted);font-size:.72rem;display:block;font-family:ui-sans-serif,system-ui,sans-serif;}
+.hidden{display:none !important;}
+footer{text-align:center;color:var(--muted);font-size:.75rem;margin-top:24px;font-family:ui-sans-serif,system-ui,sans-serif;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>&#9878;&#65039; KSL Bar Exam Study Tracker</h1>
+  <div class="sub">29 Sept &ndash; 31 Oct 2026 &nbsp;&bull;&nbsp; 5am&ndash;8pm daily, 3hr sessions with 1hr breaks</div>
+  <div class="progress-row">
+    <div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
+    <div class="progress-pct" id="ppct">0 / 0 done</div>
+  </div>
+  <div class="controls">
+    <select id="subjFilter"></select>
+    <button id="expandAll">Expand all</button>
+    <button id="collapseAll">Collapse all</button>
+    <button class="reset" id="resetBtn">Reset progress</button>
+  </div>
+</header>
+<div id="days"></div>
+<footer>Tap a day to expand &middot; check off each session as you finish it &middot; progress is saved on this device</footer>
+</div>
+<script>
+const DATA = {"subjects":{"C100":["Civil Litigation","#e63946"],"C101":["Criminal Litigation","#f4a261"],"C102":["Probate & Administration","#2a9d8f"],"C103":["Legal Writing & Drafting","#457b9d"],"C104":["Trial Advocacy","#9b5de5"],"C105":["Professional Ethics","#e76f51"],"C106":["Legal Practice Mgmt","#219ebc"],"C107":["Conveyancing","#588157"],"C108":["Commercial Transactions","#ff7d00"],"REV":["Revision","#6c757d"],"FIN":["Final Prep","#adb5bd"]},"days":[["2026-09-29","C100",["Overview; client interview & conferencing; legal opinion","Pre-litigation checks - cause of action, jurisdiction, limitation; demand letter","Courts & jurisdiction - constitutional/statutory/pecuniary; forum vs venue","Overriding Objective - concept, application & sanctions (Art 159)"]],["2026-09-30","C100",["Parties I - joinder, plaintiff/defendant, third & interested party","Parties II - interpleader, garnishee, AG, amicus, representative suits","Commencement of suits - Plaint, OS, Petitions (Orders 2-4)","Pleadings in reply - Defence, Counterclaim; service & amendment"]],["2026-10-01","C100",["Interlocutory applications - injunctions, Mareva/Anton Piller, discovery","Pre-trial process & hearing of suits - issues, witnesses, submissions","Rulings/judgments/decrees; remedies & execution of decrees","Review, Appeal, Judicial Review, Constitutional Litigation, Costs & Tribunals"]],["2026-10-02","C101",["Overview; jurisdiction & court structure","Arrests - with/without warrant (drafting)","Identification parades & Form P.156","Preparing files for trial (Police/Advocate/Court)"]],["2026-10-03","C101",["Complaint & charge - framing, duplicity","Charges cont'd - capital, alternative, joinder, quash","Plea & plea bargain","Bail & bond - types, sureties"]],["2026-10-04","C101",["Pre-trial conferencing","Trial process - witnesses, exhibits, no case to answer","Judgment, sentencing & appeals","Private prosecutions, inquests, extradition, habeas corpus, JR"]],["2026-10-05","C102",["Legal framework of Law of Succession (s.2,32)","Property exempted - Islamic law, co-ownership, nominations","Testate succession - wills & codicils, capacity","Revocation, alteration & revival of wills"]],["2026-10-06","C102",["Proof & objections to wills","Reasonable provision; intro to intestate succession","Protection of estate; jurisdiction","Petition for grant of letters of administration"]],["2026-10-07","C102",["Objections to grants","Confirmation of grants; reasonable provision (intestate)","Revocation/annulment of grants; limited grants","Foreign succession; powers of personal reps; estate accounts"]],["2026-10-08","C103",["Plain English vs Legalese; bias-free language","Process of effective writing","Paragraphing & sentence structure/voice","Transitions; legal research; case briefs"]],["2026-10-09","C103",["Intro to drafting; letters & correspondence","Drafting demand letters","Drafting legal opinions & memos","Drafting contracts, POA, affidavits, deed polls"]],["2026-10-10","C103",["Legislative drafting intro","Key legislations; structure of a Bill","Legislative sentence; amending legislation","Penal provisions & delegated legislation"]],["2026-10-11","C104",["Intro to trial advocacy - key skills, history","Qualities of a good trial lawyer","Ethical duties of trial lawyers","Conflict of interest - Cab Rank rule"]],["2026-10-12","C104",["Court etiquette","Dimensions & rules of advocacy","Psychology of advocacy","Preparation for trial - interviews, research"]],["2026-10-13","C104",["Pre-trial case analysis","The opening statement","Examination-in-chief, cross & re-examination","Closing argument, objections, appellate advocacy, contempt"]],["2026-10-14","C105",["Intro to ethics; law as profession; LSK","Overriding values; SOPPEC overview","Fidelity to law; honesty & integrity (ss.55-56)","Role of lawyer in society; pro bono"]],["2026-10-15","C105",["Confidentiality & privilege (ss.134-137 Evidence Act)","Professional undertakings","Conflict of interest; judicial recusal","Competence, diligence & negligence"]],["2026-10-16","C105",["Professional fees & remuneration; retainer","Taxation of costs; fiduciary duty over funds","Advocate's lien; touting & advertising","Contempt of court; disciplinary process; AI/AML ethics"]],["2026-10-17","C106",["Office admin intro; front office services","Standards, policies & ICT","Record management; procurement","Safety, security & disaster mgmt; harassment"]],["2026-10-18","C106",["HR planning; job analysis & design","Recruitment, selection & induction","Training & career development","Internal mobility & separation"]],["2026-10-19","C106",["Accounting framework; book-keeping","Bank reconciliation; final accounts","Partnership & advocates' accounts","Cash flow; cost accounting & budgeting"]],["2026-10-20","C107",["Intro & history of conveyancing","Land categories, tenure & interests","Pre-contract stage & due diligence","Contract stage - sale agreement terms"]],["2026-10-21","C107",["Other dispositions - auction, off-plan, sectional","Transfer & registration","Completion docs; transmissions","Leases/tenancies - types & registration"]],["2026-10-22","C107",["Controlled tenancies; assignments; remedies","Charges - types, priority, requirements","Remedies of chargee/chargor; sale by chargee","Easements, cautions; stamp duty & CGT"]],["2026-10-23","C108",["Companies - formation & types","Statutory compliance, shares, charges","Partnerships - forms, deed, dissolution","Mergers & acquisitions - framework"]],["2026-10-24","C108",["Take-overs - listed companies, minority rights","Insolvency - bankruptcy applications","Corporate insolvency - liquidation, administration","Financial services & data protection"]],["2026-10-25","C108",["Commercial agreements - JV, franchise, guarantee","Movable Property Security Rights - creation","MPSR - registration & enforcement","Tax procedures in commercial transactions"]],["2026-10-26","REV",["Civil Litigation - past paper practice","Criminal Litigation - past paper practice","Probate & Administration - past paper practice","Legal Writing & Drafting - exercise"]],["2026-10-27","REV",["Trial Advocacy - mock oral session","Professional Ethics - past paper practice","Legal Practice Mgmt - past paper practice","Conveyancing - past paper practice"]],["2026-10-28","REV",["Commercial Transactions - past paper practice","Weak areas review - session 1","Weak areas review - session 2","Weak areas review - session 3"]],["2026-10-29","REV",["Full mock exam - Paper 1","Full mock exam - Paper 2","Review mock answers & feedback","Group discussion / peer consultation"]],["2026-10-30","REV",["Final revision - statutes summary sheets","Final revision - case law flashcards","Light reading / rest","Mental prep & exam logistics check"]],["2026-10-31","FIN",["Light review of personal summary notes","Confirm exam venue, ID & materials","Relaxation & light reading only","Early rest - no new material"]]]};
+const STORE_KEY = 'ksl-bar-tracker-v1';
+let checked = {};
+try { checked = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch(e) { checked = {}; }
+
+const TIMES = ['5:00 - 8:00 AM','9:00 AM - 12:00 PM','1:00 - 4:00 PM','5:00 - 8:00 PM'];
+const daysEl = document.getElementById('days');
+const subjSel = document.getElementById('subjFilter');
+
+function fmtDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+}
+
+let opt = '<option value="ALL">All subjects</option>';
+for (const code in DATA.subjects){ opt += `<option value="${code}">${DATA.subjects[code][0]}</option>`; }
+subjSel.innerHTML = opt;
+
+function render(){
+  daysEl.innerHTML = '';
+  DATA.days.forEach((day, di) => {
+    const [iso, code, topics] = day;
+    const [name, color] = DATA.subjects[code];
+    const div = document.createElement('div');
+    div.className = 'day';
+    div.dataset.subj = code;
+    let doneCount = 0;
+    topics.forEach((t,si) => { if (checked[di+'-'+si]) doneCount++; });
+    div.innerHTML = `
+      <div class="day-head">
+        <span class="dot" style="background:${color}"></span>
+        <div>
+          <div class="day-date">${fmtDate(iso)}</div>
+          <div class="day-sub">${name}</div>
+        </div>
+        <div class="day-meta">
+          <span class="count">${doneCount}/4</span>
+          <span class="chev">&#9656;</span>
+        </div>
+      </div>
+      <div class="sessions">
+        ${topics.map((t,si)=>`
+          <label class="sess ${checked[di+'-'+si]?'done':''}" data-key="${di}-${si}">
+            <input type="checkbox" ${checked[di+'-'+si]?'checked':''} data-key="${di}-${si}">
+            <span>
+              <span class="time">${TIMES[si]}</span>
+              <span class="topic">${t}</span>
+            </span>
+          </label>`).join('')}
+      </div>
+    `;
+    div.querySelector('.day-head').addEventListener('click', () => div.classList.toggle('open'));
+    daysEl.appendChild(div);
+  });
+  daysEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', e => {
+      const key = e.target.dataset.key;
+      checked[key] = e.target.checked;
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(checked)); } catch(err){}
+      e.target.closest('.sess').classList.toggle('done', e.target.checked);
+      updateProgress();
+      render();
+      applyFilter();
+    });
+  });
+  updateProgress();
+}
+
+function updateProgress(){
+  let total = 0, done = 0;
+  DATA.days.forEach((day, di) => {
+    day[2].forEach((t, si) => { total++; if (checked[di+'-'+si]) done++; });
+  });
+  const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('pfill').style.width = pct + '%';
+  document.getElementById('ppct').textContent = `${done} / ${total} done (${pct}%)`;
+}
+
+function applyFilter(){
+  const v = subjSel.value;
+  daysEl.querySelectorAll('.day').forEach(d => {
+    d.classList.toggle('hidden', v !== 'ALL' && d.dataset.subj !== v);
+  });
+}
+
+subjSel.addEventListener('change', applyFilter);
+document.getElementById('expandAll').addEventListener('click', () => daysEl.querySelectorAll('.day').forEach(d=>d.classList.add('open')));
+document.getElementById('collapseAll').addEventListener('click', () => daysEl.querySelectorAll('.day').forEach(d=>d.classList.remove('open')));
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (confirm('Reset all checked progress?')) {
+    checked = {};
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(checked)); } catch(e){}
+    render();
+    applyFilter();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
